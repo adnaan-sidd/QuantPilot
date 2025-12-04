@@ -6,6 +6,9 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, (process as any).cwd(), '');
   return {
     plugins: [react()],
+    resolve: {
+      extensions: ['.tsx', '.ts', '.jsx', '.js']
+    },
     define: {
       // Polyfill process.env for the AI service
       'process.env.API_KEY': JSON.stringify(env.API_KEY) 
