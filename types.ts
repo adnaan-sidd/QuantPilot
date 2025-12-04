@@ -77,7 +77,6 @@ export interface EquityPoint {
   high?: number;
   low?: number;
   close?: number;
-  value?: number; // Added for line chart compatibility
 }
 
 export interface MarketDataPoint {

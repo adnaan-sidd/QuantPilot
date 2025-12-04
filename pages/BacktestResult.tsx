@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend } from 'recharts';
-import { createChart, ColorType, IChartApi, ISeriesApi, CrosshairMode, AreaSeries, LineSeries, CandlestickSeries } from 'lightweight-charts';
+import { createChart, ColorType, IChartApi, ISeriesApi, CrosshairMode } from 'lightweight-charts';
 import { Backtest, StrategyConfig, DataSource, AIReport, MarketDataPoint, Trade } from '../types';
 import { generateBotCode, generateReportNarrative } from '../services/aiService';
 import { runMockBacktest } from '../services/mockEngine';
@@ -25,7 +25,7 @@ const GradeBadge = ({ grade }: { grade: string }) => {
     );
 };
 
-// --- LIGHTWEIGHT CHART WRAPPER (v5 Compatible) ---
+// --- LIGHTWEIGHT CHART WRAPPER ---
 const LightweightChart = ({ 
     type, 
     data, 
@@ -33,7 +33,7 @@ const LightweightChart = ({
     markers = [], 
     colors = { up: '#4ade80', down: '#f87171' } 
 }: { 
-    type: 'Equity' | 'Price' | 'Drawdown', 
+    type: 'Equity' | 'Price', 
     data: any[], 
     chartType?: 'Area' | 'Line' | 'Candlestick',
     markers?: any[],
@@ -70,36 +70,24 @@ const LightweightChart = ({
 
         let series: ISeriesApi<any>;
 
-        if (type === 'Drawdown') {
-             // Drawdown is specifically an Area chart usually, typically Red
-             series = chart.addSeries(AreaSeries, {
-                lineColor: colors.down,
-                topColor: 'rgba(248, 113, 113, 0.0)', // Transparent at top (0%)
-                bottomColor: 'rgba(248, 113, 113, 0.4)', // Red at bottom (max DD)
-                lineWidth: 2,
-            });
-            series.setData(data.map(d => ({ time: d.time, value: d.value })));
-
-        } else if (chartType === 'Area') {
-            series = chart.addSeries(AreaSeries, {
+        if (chartType === 'Area') {
+            series = chart.addAreaSeries({
                 lineColor: colors.up,
                 topColor: 'rgba(74, 222, 128, 0.4)',
                 bottomColor: 'rgba(74, 222, 128, 0.0)',
             });
             // Area expects { time, value }
             series.setData(data.map(d => ({ time: d.time || d.date, value: d.value || d.close || d.equity })));
-
         } else if (chartType === 'Line') {
-            series = chart.addSeries(LineSeries, {
+            series = chart.addLineSeries({
                 color: colors.up,
                 lineWidth: 2,
             });
              // Line expects { time, value }
              series.setData(data.map(d => ({ time: d.time || d.date, value: d.value || d.close || d.equity })));
-
         } else {
             // Candlestick
-            series = chart.addSeries(CandlestickSeries, {
+            series = chart.addCandlestickSeries({
                 upColor: colors.up,
                 downColor: colors.down,
                 borderVisible: false,
@@ -134,7 +122,7 @@ const LightweightChart = ({
             window.removeEventListener('resize', handleResize);
             chart.remove();
         };
-    }, [data, chartType, markers, colors, type]);
+    }, [data, chartType, markers, colors]);
 
     return <div ref={chartContainerRef} className="w-full h-[350px]" />;
 };
@@ -311,20 +299,6 @@ const BacktestResult = () => {
           low: p.low || p.equity,
           close: p.close || p.equity
       }));
-  }, [backtest?.equityCurve]);
-
-  // Drawdown Calculation for Chart
-  const drawdownData = useMemo(() => {
-      if (!backtest?.equityCurve) return [];
-      let maxEquity = -Infinity;
-      return backtest.equityCurve.map(p => {
-          if (p.equity > maxEquity) maxEquity = p.equity;
-          const dd = ((p.equity - maxEquity) / maxEquity) * 100; // Returns negative percentage or 0
-          return {
-              time: p.date,
-              value: dd
-          };
-      });
   }, [backtest?.equityCurve]);
 
   const priceData = useMemo(() => {
@@ -577,54 +551,6 @@ const BacktestResult = () => {
             />
           </div>
 
-          {/* Drawdown Chart */}
-          <div className="lg:col-span-1 bg-slate-900 border border-slate-800 p-6 rounded-xl">
-                 <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                     <TrendingDown className="w-5 h-5 text-red-400" /> Underwater Drawdown
-                 </h3>
-                 <LightweightChart 
-                    type="Drawdown" 
-                    data={drawdownData} 
-                    chartType="Area"
-                    colors={{ up: '#f87171', down: '#f87171' }}
-                />
-          </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Price & Entry/Exit Visualization */}
-          <div className="lg:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-xl">
-               <div className="flex justify-between items-center mb-6">
-                   <h3 className="text-lg font-bold text-white">Price Action & Signals</h3>
-                   <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
-                        {['Line', 'Candlestick'].map(t => (
-                            <button 
-                                key={t}
-                                onClick={() => setPriceChartType(t as any)}
-                                className={`px-3 py-1 text-xs font-medium rounded ${priceChartType === t ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-                            >
-                                {t}
-                            </button>
-                        ))}
-                    </div>
-               </div>
-               
-               {priceData.length > 0 && (
-                <LightweightChart 
-                    type="Price"
-                    data={priceData}
-                    chartType={priceChartType}
-                    markers={priceMarkers} // distinct markers
-                    colors={{ up: '#4ade80', down: '#f87171' }}
-                />
-               )}
-               <div className="mt-2 text-xs text-slate-500 flex gap-4 justify-end">
-                   <span className="flex items-center gap-1"><span className="w-2 h-2 bg-green-400 rounded-full"></span> Buy Entry</span>
-                   <span className="flex items-center gap-1"><span className="w-2 h-2 bg-red-400 rounded-full"></span> Sell Entry</span>
-                   <span className="flex items-center gap-1"><span className="w-2 h-2 bg-yellow-500 rounded-full"></span> Profitable Exit</span>
-               </div>
-           </div>
-
           {/* Win/Loss Pie Chart & Trade Stats */}
           <div className="lg:col-span-1 bg-slate-900 border border-slate-800 p-6 rounded-xl flex flex-col items-center justify-between">
              <div className="w-full">
@@ -671,6 +597,39 @@ const BacktestResult = () => {
              </div>
           </div>
       </div>
+
+       {/* Price & Entry/Exit Visualization */}
+       {priceData.length > 0 && (
+           <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
+               <div className="flex justify-between items-center mb-6">
+                   <h3 className="text-lg font-bold text-white">Price Action & Signals</h3>
+                   <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
+                        {['Line', 'Candlestick'].map(t => (
+                            <button 
+                                key={t}
+                                onClick={() => setPriceChartType(t as any)}
+                                className={`px-3 py-1 text-xs font-medium rounded ${priceChartType === t ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                            >
+                                {t}
+                            </button>
+                        ))}
+                    </div>
+               </div>
+               
+               <LightweightChart 
+                   type="Price"
+                   data={priceData}
+                   chartType={priceChartType}
+                   markers={priceMarkers} // distinct markers
+                   colors={{ up: '#4ade80', down: '#f87171' }}
+               />
+               <div className="mt-2 text-xs text-slate-500 flex gap-4 justify-end">
+                   <span className="flex items-center gap-1"><span className="w-2 h-2 bg-green-400 rounded-full"></span> Buy Entry</span>
+                   <span className="flex items-center gap-1"><span className="w-2 h-2 bg-red-400 rounded-full"></span> Sell Entry</span>
+                   <span className="flex items-center gap-1"><span className="w-2 h-2 bg-yellow-500 rounded-full"></span> Profitable Exit</span>
+               </div>
+           </div>
+       )}
 
       {/* Tabs */}
       <div className="flex border-b border-slate-800">
