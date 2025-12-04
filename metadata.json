@@ -1,0 +1,5 @@
+{
+  "name": "QuantPilot AI",
+  "description": "A SaaS platform where users describe trading strategies in plain English. The AI parses the strategy, fetches data, runs a client-side simulation, and generates professional performance reports and bot code (MT5, Pine Script).",
+  "requestFramePermissions": []
+}
